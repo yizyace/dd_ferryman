@@ -11,6 +11,8 @@ path = "src/main.rs"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 dirs = "6"
+rcgen = "0.13"
+time = "0.3"
 tokio = { version = "1", features = ["full"] }
 
 [lints.rust]
