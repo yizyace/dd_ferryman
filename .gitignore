@@ -1,0 +1,20 @@
+# Rust
+/target/
+/rust_out/
+**/*.rs.bk
+Cargo.lock
+
+# VSCode
+.vscode/
+
+# Claude Code
+.claude/
+
+# GitHub Copilot
+.copilot/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
