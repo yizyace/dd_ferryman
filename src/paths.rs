@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 
-fn data_dir() -> Result<PathBuf> {
+pub(crate) fn data_dir() -> Result<PathBuf> {
     let home = dirs::home_dir().context("could not determine home directory")?;
     Ok(home.join(".dd-ferryman"))
 }
