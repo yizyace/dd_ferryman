@@ -10,6 +10,8 @@ use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
 use tracing::{debug, warn};
 
+pub const PORT_FILENAME: &str = ".dd-ferryman";
+
 #[derive(Clone)]
 pub struct ProxyState {
     apps_dir: PathBuf,
@@ -28,10 +30,31 @@ fn extract_app_name(host: &str) -> Option<&str> {
     host.strip_suffix(".test")
 }
 
-fn resolve_port(apps_dir: &Path, app_name: &str) -> Option<u16> {
-    let path = apps_dir.join(app_name);
-    let contents = std::fs::read_to_string(&path).ok()?;
+fn read_port(path: &Path) -> Option<u16> {
+    let contents = std::fs::read_to_string(path).ok()?;
     contents.trim().parse().ok()
+}
+
+fn resolve_port(apps_dir: &Path, app_name: &str) -> Option<u16> {
+    let entry = apps_dir.join(app_name);
+    let meta = std::fs::symlink_metadata(&entry).ok()?;
+
+    if meta.is_symlink() {
+        let target = std::fs::read_link(&entry).ok()?;
+        let resolved = if target.is_absolute() {
+            target
+        } else {
+            apps_dir.join(&target)
+        };
+        let target_meta = std::fs::metadata(&resolved).ok()?;
+        if target_meta.is_dir() {
+            read_port(&resolved.join(PORT_FILENAME))
+        } else {
+            read_port(&resolved)
+        }
+    } else {
+        read_port(&entry)
+    }
 }
 
 #[allow(clippy::missing_panics_doc)]
@@ -132,5 +155,55 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("badapp"), "not-a-port").unwrap();
         assert_eq!(resolve_port(dir.path(), "badapp"), None);
+    }
+
+    #[test]
+    fn resolve_port_follows_symlink_to_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let app_dir = dir.path().join("my_project");
+        std::fs::create_dir(&app_dir).unwrap();
+        std::fs::write(app_dir.join(PORT_FILENAME), "4000\n").unwrap();
+
+        let apps = dir.path().join("apps");
+        std::fs::create_dir(&apps).unwrap();
+        std::os::unix::fs::symlink(&app_dir, apps.join("myapp")).unwrap();
+
+        assert_eq!(resolve_port(&apps, "myapp"), Some(4000));
+    }
+
+    #[test]
+    fn resolve_port_returns_none_for_symlink_without_port_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let app_dir = dir.path().join("my_project");
+        std::fs::create_dir(&app_dir).unwrap();
+
+        let apps = dir.path().join("apps");
+        std::fs::create_dir(&apps).unwrap();
+        std::os::unix::fs::symlink(&app_dir, apps.join("myapp")).unwrap();
+
+        assert_eq!(resolve_port(&apps, "myapp"), None);
+    }
+
+    #[test]
+    fn resolve_port_returns_none_for_broken_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let apps = dir.path().join("apps");
+        std::fs::create_dir(&apps).unwrap();
+        std::os::unix::fs::symlink("/nonexistent/path", apps.join("ghost")).unwrap();
+
+        assert_eq!(resolve_port(&apps, "ghost"), None);
+    }
+
+    #[test]
+    fn resolve_port_follows_symlink_to_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let port_file = dir.path().join("port");
+        std::fs::write(&port_file, "5000\n").unwrap();
+
+        let apps = dir.path().join("apps");
+        std::fs::create_dir(&apps).unwrap();
+        std::os::unix::fs::symlink(&port_file, apps.join("myapp")).unwrap();
+
+        assert_eq!(resolve_port(&apps, "myapp"), Some(5000));
     }
 }
