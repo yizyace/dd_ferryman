@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(
     name = "dd-ferryman",
+    version,
     about = "Local DNS + HTTPS for .test domains",
     long_about = "dd-ferryman runs a local DNS and HTTPS server so that .test domains \
                   resolve and serve trusted TLS on your Mac — no /etc/hosts editing, \
