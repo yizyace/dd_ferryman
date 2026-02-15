@@ -37,6 +37,12 @@ async fn main() -> Result<()> {
             setup_logging(false);
             commands::status::run()?;
         }
+        Commands::Install => {
+            commands::install::run()?;
+        }
+        Commands::Uninstall => {
+            commands::uninstall::run()?;
+        }
     }
 
     Ok(())

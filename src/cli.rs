@@ -36,6 +36,19 @@ pub enum Commands {
                       Reports the PID, listening ports, and whether the \
                       macOS resolver is configured for .test domains.")]
     Status,
+    /// Install launchd service for automatic startup
+    #[command(long_about = "Install a launchd service so dd-ferryman starts \
+                      automatically at boot and restarts if it crashes.\n\n\
+                      Creates a LaunchDaemon plist, loads it via launchctl, \
+                      and runs first-time setup if needed.\n\n\
+                      Requires sudo.")]
+    Install,
+    /// Uninstall launchd service
+    #[command(long_about = "Uninstall the launchd service and stop dd-ferryman.\n\n\
+                      Removes the LaunchDaemon plist and unloads the service. \
+                      After uninstalling, dd-ferryman will no longer start \
+                      at boot or restart automatically.")]
+    Uninstall,
 }
 
 #[cfg(test)]
@@ -54,6 +67,8 @@ mod tests {
         assert!(help.contains("start"));
         assert!(help.contains("stop"));
         assert!(help.contains("status"));
+        assert!(help.contains("install"));
+        assert!(help.contains("uninstall"));
     }
 
     #[test]
@@ -97,5 +112,34 @@ mod tests {
         let help = String::from_utf8(buf).unwrap();
 
         assert!(help.contains("running and healthy"));
+    }
+
+    #[test]
+    fn install_help_mentions_launchd() {
+        let mut buf = Vec::new();
+        Cli::command()
+            .find_subcommand("install")
+            .unwrap()
+            .clone()
+            .write_long_help(&mut buf)
+            .unwrap();
+        let help = String::from_utf8(buf).unwrap();
+
+        assert!(help.contains("launchd"));
+        assert!(help.contains("boot"));
+    }
+
+    #[test]
+    fn uninstall_help_mentions_launchd() {
+        let mut buf = Vec::new();
+        Cli::command()
+            .find_subcommand("uninstall")
+            .unwrap()
+            .clone()
+            .write_long_help(&mut buf)
+            .unwrap();
+        let help = String::from_utf8(buf).unwrap();
+
+        assert!(help.contains("launchd"));
     }
 }
