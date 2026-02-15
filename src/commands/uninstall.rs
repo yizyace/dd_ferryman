@@ -21,8 +21,7 @@ pub fn run() -> Result<()> {
         bail!("launchctl unload failed");
     }
 
-    std::fs::remove_file(PLIST_PATH)
-        .with_context(|| format!("failed to remove {PLIST_PATH}"))?;
+    std::fs::remove_file(PLIST_PATH).with_context(|| format!("failed to remove {PLIST_PATH}"))?;
 
     process::remove_pid()?;
 

@@ -14,7 +14,10 @@ pub fn run() -> Result<()> {
     if process::is_running(pid) {
         let resolver_exists = Path::new(RESOLVER_PATH).exists();
         let launchd_installed = Path::new(PLIST_PATH).exists();
-        print!("{}", format_running(pid, resolver_exists, launchd_installed));
+        print!(
+            "{}",
+            format_running(pid, resolver_exists, launchd_installed)
+        );
     } else {
         process::remove_pid()?;
         println!("dd-ferryman is not running (stale PID file removed)");
