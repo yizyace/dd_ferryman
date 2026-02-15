@@ -17,7 +17,9 @@ pub async fn run(foreground: bool) -> Result<()> {
         process::remove_pid()?;
     }
 
-    first_run_setup()?;
+    if !foreground {
+        first_run_setup()?;
+    }
 
     if foreground {
         run_foreground().await
