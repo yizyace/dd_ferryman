@@ -47,26 +47,32 @@ impl CertResolver {
     }
 
     fn resolve_domain(&self, domain: &str) -> Option<Arc<CertifiedKey>> {
+        let domain = normalize_domain(domain);
+
         // Check cache first
         {
             let cache = self.cache.read().ok()?;
-            if let Some(key) = cache.get(domain) {
-                debug!(domain, "serving cached certificate");
+            if let Some(key) = cache.get(&domain) {
+                debug!(%domain, "serving cached certificate");
                 return Some(Arc::clone(key));
             }
         }
 
         // Generate new cert
-        info!(domain, "generating new certificate");
-        let certified_key = Arc::new(self.build_certified_key(domain).ok()?);
+        info!(%domain, "generating new certificate");
+        let certified_key = Arc::new(self.build_certified_key(&domain).ok()?);
 
         // Cache it
         if let Ok(mut cache) = self.cache.write() {
-            cache.insert(domain.to_string(), Arc::clone(&certified_key));
+            cache.insert(domain, Arc::clone(&certified_key));
         }
 
         Some(certified_key)
     }
+}
+
+fn normalize_domain(domain: &str) -> String {
+    domain.trim_end_matches('.').to_ascii_lowercase()
 }
 
 impl ResolvesServerCert for CertResolver {
@@ -99,6 +105,39 @@ mod tests {
         // Second call should use cache
         let key = resolver.resolve_domain("cached.test");
         assert!(key.is_some());
+        assert_eq!(resolver.cache.read().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn normalizes_domain_case() {
+        let ca_bundle = ca::generate_ca().unwrap();
+        let resolver = CertResolver::new(ca_bundle);
+
+        let first = resolver.resolve_domain("MyApp.test").unwrap();
+        let second = resolver.resolve_domain("myapp.test").unwrap();
+        assert!(Arc::ptr_eq(&first, &second));
+        assert_eq!(resolver.cache.read().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn normalizes_trailing_dot() {
+        let ca_bundle = ca::generate_ca().unwrap();
+        let resolver = CertResolver::new(ca_bundle);
+
+        let first = resolver.resolve_domain("app.test.").unwrap();
+        let second = resolver.resolve_domain("app.test").unwrap();
+        assert!(Arc::ptr_eq(&first, &second));
+        assert_eq!(resolver.cache.read().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn normalizes_case_and_trailing_dot() {
+        let ca_bundle = ca::generate_ca().unwrap();
+        let resolver = CertResolver::new(ca_bundle);
+
+        let first = resolver.resolve_domain("App.Test.").unwrap();
+        let second = resolver.resolve_domain("app.test").unwrap();
+        assert!(Arc::ptr_eq(&first, &second));
         assert_eq!(resolver.cache.read().unwrap().len(), 1);
     }
 }
