@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build aarch64
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Build x86_64
+        run: cargo build --release --target x86_64-apple-darwin
+
+      - name: Create universal binary
+        run: |
+          lipo -create \
+            target/aarch64-apple-darwin/release/dd-ferryman \
+            target/x86_64-apple-darwin/release/dd-ferryman \
+            -output dd-ferryman
+
+      - name: Package tarball
+        id: package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARCHIVE="dd-ferryman-${VERSION}-universal-apple-darwin.tar.gz"
+          tar czf "$ARCHIVE" dd-ferryman
+          SHA256=$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')
+          echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: ${{ steps.package.outputs.archive }}
+
+      - name: Update Homebrew tap
+        env:
+          TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        if: env.TAP_GITHUB_TOKEN != ''
+        run: |
+          VERSION="${{ steps.package.outputs.version }}"
+          SHA256="${{ steps.package.outputs.sha256 }}"
+
+          git clone "https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/yizyace/homebrew-dd-ferryman.git" tap
+          cd tap
+
+          sed -i '' "s/version \".*\"/version \"${VERSION}\"/" Formula/dd-ferryman.rb
+          sed -i '' "s/sha256 \".*\"/sha256 \"${SHA256}\"/" Formula/dd-ferryman.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/dd-ferryman.rb
+          git commit -m "chore: bump dd-ferryman to ${VERSION}"
+          git push
