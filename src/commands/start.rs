@@ -5,7 +5,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result, bail};
 use tracing::info;
 
-use crate::{dns, paths, process, server, tls};
+use crate::{dns, paths, process, proxy, server, tls};
 
 use super::{DNS_ADDR, HTTPS_ADDR, RESOLVER_PATH};
 
@@ -139,12 +139,17 @@ async fn run_foreground() -> Result<()> {
 
     let ca = tls::ca::load_or_create_ca()?;
     let cert_resolver = Arc::new(tls::resolver::CertResolver::new(ca));
+    let proxy_state = proxy::ProxyState::new(paths::apps_dir()?);
 
     let dns_addr: SocketAddr = DNS_ADDR.parse().context("invalid DNS address")?;
     let https_addr: SocketAddr = HTTPS_ADDR.parse().context("invalid HTTPS address")?;
 
     let dns_handle = tokio::spawn(dns::run_dns_server(dns_addr));
-    let https_handle = tokio::spawn(server::run_https_server(https_addr, cert_resolver));
+    let https_handle = tokio::spawn(server::run_https_server(
+        https_addr,
+        cert_resolver,
+        proxy_state,
+    ));
 
     tokio::select! {
         result = dns_handle => {
