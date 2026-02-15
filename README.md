@@ -4,6 +4,13 @@ Local DNS + HTTPS for `.test` domains on macOS.
 
 dd-ferryman runs two servers — a **DNS server** on UDP and an **HTTPS server** on TCP — so that any `.test` domain resolves to your machine and gets a trusted TLS certificate automatically. The DNS server makes the domain work; the HTTPS server terminates TLS and proxies to your app.
 
+## Installation
+
+```bash
+brew tap yizyace/dd-ferryman
+brew install dd-ferryman
+```
+
 ## Quick Start
 
 ```bash
