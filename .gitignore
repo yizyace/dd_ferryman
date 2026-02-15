@@ -1,7 +1,8 @@
+/tmp/*
+
 # Rust
 /target/
 **/*.rs.bk
-Cargo.lock
 
 # VSCode
 .vscode/
