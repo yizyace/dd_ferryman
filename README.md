@@ -17,6 +17,24 @@ sudo dd-ferryman status
 sudo dd-ferryman stop
 ```
 
+## Install vs Start
+
+dd-ferryman has two ways to run: **manual** (`start`/`stop`) and **installed** (`install`/`uninstall`).
+
+| | Manual | Installed |
+|---|--------|-----------|
+| **Start** | `sudo dd-ferryman start` | `sudo dd-ferryman install` |
+| **Stop** | `sudo dd-ferryman stop` | `sudo dd-ferryman uninstall` |
+| **Survives reboot** | No | Yes |
+| **Restarts on crash** | No | Yes |
+| **Mechanism** | Spawns a background process | Creates a macOS launchd service |
+
+**Manual mode** — `start` spawns a daemon process. `stop` sends it SIGTERM. If your machine reboots or the process crashes, dd-ferryman won't come back until you run `start` again.
+
+**Installed mode** — `install` creates a LaunchDaemon plist at `/Library/LaunchDaemons/com.dd-ferryman.plist` and loads it via `launchctl`. macOS will start dd-ferryman at boot (`RunAtLoad`) and restart it if it dies (`KeepAlive`). `uninstall` removes the plist and stops the service.
+
+Use `install` if you want dd-ferryman always available. Use `start`/`stop` for temporary sessions or debugging (pass `--foreground` to see logs in your terminal).
+
 ## What Happens on First Run
 
 1. Generates a local CA certificate in `~/.dd-ferryman/ca/`

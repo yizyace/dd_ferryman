@@ -17,7 +17,9 @@ pub async fn run(foreground: bool) -> Result<()> {
         process::remove_pid()?;
     }
 
-    first_run_setup()?;
+    if !foreground {
+        first_run_setup()?;
+    }
 
     if foreground {
         run_foreground().await
@@ -26,7 +28,7 @@ pub async fn run(foreground: bool) -> Result<()> {
     }
 }
 
-fn first_run_setup() -> Result<()> {
+pub(crate) fn first_run_setup() -> Result<()> {
     paths::ensure_dirs()?;
 
     if !tls::ca::ca_exists()? {
