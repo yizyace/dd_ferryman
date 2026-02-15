@@ -99,7 +99,12 @@ fn load_or_create_ca_in(dir: &Path) -> Result<CaBundle> {
 
 #[cfg(test)]
 mod tests {
+    use std::os::unix::fs::MetadataExt;
+
+    use tempfile::TempDir;
+
     use super::*;
+    use crate::tls::cert::generate_leaf_cert;
 
     #[test]
     fn generates_valid_ca() {
@@ -111,5 +116,99 @@ mod tests {
                 .serialize_pem()
                 .contains("BEGIN PRIVATE KEY")
         );
+    }
+
+    #[test]
+    fn save_load_round_trip() {
+        let dir = TempDir::new().unwrap();
+        let bundle = generate_ca().unwrap();
+        save_ca_to(&bundle, dir.path()).unwrap();
+
+        let loaded = load_ca_from(dir.path()).unwrap();
+        let (cert, _key) = generate_leaf_cert("round-trip.test", &loaded).unwrap();
+        assert!(cert.pem().contains("BEGIN CERTIFICATE"));
+    }
+
+    #[test]
+    fn ca_exists_neither_file() {
+        let dir = TempDir::new().unwrap();
+        assert!(!ca_exists_in(dir.path()));
+    }
+
+    #[test]
+    fn ca_exists_cert_only() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("ca.crt"), "cert-data").unwrap();
+        assert!(!ca_exists_in(dir.path()));
+    }
+
+    #[test]
+    fn ca_exists_key_only() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("ca.key"), "key-data").unwrap();
+        assert!(!ca_exists_in(dir.path()));
+    }
+
+    #[test]
+    fn ca_exists_both_files() {
+        let dir = TempDir::new().unwrap();
+        let bundle = generate_ca().unwrap();
+        save_ca_to(&bundle, dir.path()).unwrap();
+        assert!(ca_exists_in(dir.path()));
+    }
+
+    #[test]
+    fn partial_write_recovery() {
+        let dir = TempDir::new().unwrap();
+        // Simulate partial write: only cert file exists
+        let bundle = generate_ca().unwrap();
+        fs::write(dir.path().join("ca.crt"), bundle.cert.pem()).unwrap();
+        assert!(!ca_exists_in(dir.path()));
+
+        let recovered = load_or_create_ca_in(dir.path()).unwrap();
+        assert!(ca_exists_in(dir.path()));
+        let (cert, _key) = generate_leaf_cert("recovery.test", &recovered).unwrap();
+        assert!(cert.pem().contains("BEGIN CERTIFICATE"));
+    }
+
+    #[test]
+    fn load_or_create_first_run() {
+        let dir = TempDir::new().unwrap();
+        let bundle = load_or_create_ca_in(dir.path()).unwrap();
+        assert!(dir.path().join("ca.crt").exists());
+        assert!(dir.path().join("ca.key").exists());
+        let (cert, _key) = generate_leaf_cert("first-run.test", &bundle).unwrap();
+        assert!(cert.pem().contains("BEGIN CERTIFICATE"));
+    }
+
+    #[test]
+    fn load_or_create_subsequent_run() {
+        let dir = TempDir::new().unwrap();
+        load_or_create_ca_in(dir.path()).unwrap();
+        let key_bytes = fs::read(dir.path().join("ca.key")).unwrap();
+
+        // Second call should load from disk, not regenerate
+        load_or_create_ca_in(dir.path()).unwrap();
+        let key_bytes_after = fs::read(dir.path().join("ca.key")).unwrap();
+        assert_eq!(key_bytes, key_bytes_after);
+    }
+
+    #[test]
+    fn save_ca_creates_directory() {
+        let dir = TempDir::new().unwrap();
+        let nested = dir.path().join("nested").join("sub");
+        let bundle = generate_ca().unwrap();
+        save_ca_to(&bundle, &nested).unwrap();
+        assert!(nested.join("ca.crt").exists());
+        assert!(nested.join("ca.key").exists());
+    }
+
+    #[test]
+    fn key_file_permissions() {
+        let dir = TempDir::new().unwrap();
+        let bundle = generate_ca().unwrap();
+        save_ca_to(&bundle, dir.path()).unwrap();
+        let mode = fs::metadata(dir.path().join("ca.key")).unwrap().mode();
+        assert_eq!(mode & 0o777, 0o600);
     }
 }
