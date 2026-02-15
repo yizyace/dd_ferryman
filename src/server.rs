@@ -4,8 +4,6 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use axum::Router;
 use axum::body::Body;
-use axum::http::header;
-use axum::response::Html;
 use axum::routing::any;
 use hyper::Request;
 use hyper::body::Incoming;
@@ -15,16 +13,23 @@ use tokio_rustls::TlsAcceptor;
 use tower::Service;
 use tracing::{debug, error, info};
 
+use crate::proxy::{self, ProxyState};
 use crate::tls::resolver::CertResolver;
 
-pub async fn run_https_server(addr: SocketAddr, cert_resolver: Arc<CertResolver>) -> Result<()> {
+pub async fn run_https_server(
+    addr: SocketAddr,
+    cert_resolver: Arc<CertResolver>,
+    proxy_state: ProxyState,
+) -> Result<()> {
     let tls_config = ServerConfig::builder()
         .with_no_client_auth()
         .with_cert_resolver(cert_resolver);
 
     let tls_acceptor = TlsAcceptor::from(Arc::new(tls_config));
 
-    let app = Router::new().fallback(any(handler));
+    let app = Router::new()
+        .fallback(any(proxy::handler))
+        .with_state(proxy_state);
 
     let listener = TcpListener::bind(addr)
         .await
@@ -70,24 +75,4 @@ pub async fn run_https_server(addr: SocketAddr, cert_resolver: Arc<CertResolver>
             }
         });
     }
-}
-
-async fn handler(req: axum::extract::Request) -> Html<String> {
-    let host = req
-        .headers()
-        .get(header::HOST)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("unknown");
-
-    info!(host, "HTTPS request");
-    Html(format!(
-        r"<!DOCTYPE html>
-<html>
-<head><title>dd-ferryman</title></head>
-<body>
-<h1>dd-ferryman is running</h1>
-<p>Visiting: <strong>{host}</strong></p>
-</body>
-</html>"
-    ))
 }

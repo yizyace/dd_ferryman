@@ -19,6 +19,10 @@ pub fn ca_key_path() -> Result<PathBuf> {
     Ok(ca_dir()?.join("ca.key"))
 }
 
+pub fn apps_dir() -> Result<PathBuf> {
+    Ok(data_dir()?.join("apps"))
+}
+
 pub fn pid_path() -> Result<PathBuf> {
     Ok(data_dir()?.join("ferryman.pid"))
 }
@@ -28,9 +32,10 @@ pub fn log_path() -> Result<PathBuf> {
 }
 
 pub fn ensure_dirs() -> Result<()> {
-    let ca = ca_dir()?;
-    std::fs::create_dir_all(&ca)
-        .with_context(|| format!("failed to create directory: {}", ca.display()))?;
+    for dir in [ca_dir()?, apps_dir()?] {
+        std::fs::create_dir_all(&dir)
+            .with_context(|| format!("failed to create directory: {}", dir.display()))?;
+    }
     Ok(())
 }
 
