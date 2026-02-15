@@ -26,7 +26,7 @@ pub async fn run(foreground: bool) -> Result<()> {
     }
 }
 
-fn first_run_setup() -> Result<()> {
+pub(crate) fn first_run_setup() -> Result<()> {
     paths::ensure_dirs()?;
 
     if !tls::ca::ca_exists()? {
