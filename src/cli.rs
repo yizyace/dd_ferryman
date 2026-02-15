@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -50,6 +52,31 @@ pub enum Commands {
                       After uninstalling, dd-ferryman will no longer start \
                       at boot or restart automatically.")]
     Uninstall,
+    /// Register an app for proxying on a .test domain
+    #[command(long_about = "Register an app for proxying on a .test domain.\n\n\
+                      With no flags, creates a symlink from the apps directory to the \
+                      current (or specified) path. The app must contain a .dd-ferryman \
+                      file with the port number.\n\n\
+                      With --port, writes a plain-text port file directly (no symlink). \
+                      The name defaults to the directory basename, or can be set with --name.")]
+    Link {
+        /// Name for the .test domain (defaults to directory basename)
+        #[arg(long)]
+        name: Option<String>,
+        /// Write a port file instead of creating a symlink
+        #[arg(long)]
+        port: Option<u16>,
+        /// Path to the app directory (defaults to current directory)
+        path: Option<PathBuf>,
+    },
+    /// Remove an app registration
+    #[command(long_about = "Remove an app registration.\n\n\
+                      Removes the symlink or port file from the apps directory. \
+                      The app itself is not modified.")]
+    Unlink {
+        /// Name of the .test domain to remove
+        name: String,
+    },
 }
 
 #[cfg(test)]
@@ -70,6 +97,8 @@ mod tests {
         assert!(help.contains("status"));
         assert!(help.contains("install"));
         assert!(help.contains("uninstall"));
+        assert!(help.contains("link"));
+        assert!(help.contains("unlink"));
     }
 
     #[test]
@@ -142,5 +171,35 @@ mod tests {
         let help = String::from_utf8(buf).unwrap();
 
         assert!(help.contains("launchd"));
+    }
+
+    #[test]
+    fn link_help_mentions_symlink() {
+        let mut buf = Vec::new();
+        Cli::command()
+            .find_subcommand("link")
+            .unwrap()
+            .clone()
+            .write_long_help(&mut buf)
+            .unwrap();
+        let help = String::from_utf8(buf).unwrap();
+
+        assert!(help.contains("symlink"));
+        assert!(help.contains("--port"));
+        assert!(help.contains("--name"));
+    }
+
+    #[test]
+    fn unlink_help_mentions_remove() {
+        let mut buf = Vec::new();
+        Cli::command()
+            .find_subcommand("unlink")
+            .unwrap()
+            .clone()
+            .write_long_help(&mut buf)
+            .unwrap();
+        let help = String::from_utf8(buf).unwrap();
+
+        assert!(help.contains("Remove"));
     }
 }

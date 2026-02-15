@@ -43,6 +43,12 @@ async fn main() -> Result<()> {
         Commands::Uninstall => {
             commands::uninstall::run()?;
         }
+        Commands::Link { name, port, path } => {
+            commands::link::run(name.as_deref(), port, path.as_deref())?;
+        }
+        Commands::Unlink { name } => {
+            commands::unlink::run(&name)?;
+        }
     }
 
     Ok(())
