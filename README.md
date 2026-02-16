@@ -22,7 +22,43 @@ sudo dd-ferryman status
 
 # Stop servers
 sudo dd-ferryman stop
+
+# Register your app
+dd-ferryman link --port 3000 --name myapp
+# Now visit https://myapp.test
 ```
+
+## Registering Apps
+
+Use `dd-ferryman link` to register an app and `dd-ferryman unlink` to remove it. There are two modes:
+
+### Port mode (`--port`)
+
+Writes a static port number to `~/.dd-ferryman/apps/<name>`. This is the simplest option — just tell dd-ferryman which port your app listens on:
+
+```bash
+dd-ferryman link --port 3000              # name defaults to current directory name
+dd-ferryman link --port 3000 --name api   # explicit name → api.test
+```
+
+### Symlink mode (default)
+
+Creates a symlink from `~/.dd-ferryman/apps/<name>` to your project directory. The project must contain a `.dd-ferryman` file with the port number. This way the port can change without re-linking:
+
+```bash
+echo 3000 > .dd-ferryman
+dd-ferryman link                          # symlinks current dir, name defaults to dir name
+dd-ferryman link /path/to/project         # symlinks a specific directory
+dd-ferryman link --name frontend          # explicit name → frontend.test
+```
+
+### Unlinking
+
+```bash
+dd-ferryman unlink myapp                  # removes myapp.test (works for both modes)
+```
+
+**Which mode to pick?** Port mode is simpler — one command and you're done. Symlink mode is useful when the port lives in version control (the `.dd-ferryman` file), so every contributor gets the same setup after running `link` once and the port can change without re-linking.
 
 ## Install vs Start
 
@@ -101,7 +137,8 @@ All state lives in `~/.dd-ferryman/`:
 │   ├── ca.crt          # Local CA certificate (PEM)
 │   └── ca.key          # CA private key (PEM, mode 0600)
 ├── apps/
-│   └── <app-name>      # Plain text file containing a port number
+│   ├── myapp            # Port file (contains "3000")
+│   └── frontend -> /path/to/project  # Symlink to project dir
 ├── ferryman.pid        # PID of the running daemon
 └── ferryman.log        # Daemon stdout/stderr (append-only)
 ```
@@ -110,7 +147,7 @@ All state lives in `~/.dd-ferryman/`:
 |------|---------|
 | `ca/ca.crt` | Self-signed root CA certificate. Trusted in the macOS system keychain on first run. Used to sign per-domain leaf certificates at runtime. |
 | `ca/ca.key` | CA private key. Restricted to owner-only read/write (`0600`). Used to sign leaf certificates on the fly. |
-| `apps/<name>` | One file per app. The filename is the subdomain (e.g. `myapp` for `myapp.test`) and the contents are the port number your app listens on. Create these yourself — e.g. `echo 3000 > ~/.dd-ferryman/apps/myapp`. |
+| `apps/<name>` | One file per app. The filename is the subdomain (e.g. `myapp` for `myapp.test`). Created by `dd-ferryman link` — either a plain text file containing a port number (port mode) or a symlink to a project directory (symlink mode). You can also create port files manually: `echo 3000 > ~/.dd-ferryman/apps/myapp`. |
 | `ferryman.pid` | Written on daemon start, removed on stop. Used to detect whether the daemon is already running. |
 | `ferryman.log` | Captured stdout/stderr from the background daemon process. Appended to across restarts. |
 

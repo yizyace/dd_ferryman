@@ -30,6 +30,7 @@ pub async fn run(foreground: bool) -> Result<()> {
 
 pub(crate) fn first_run_setup() -> Result<()> {
     paths::ensure_dirs()?;
+    paths::fix_data_dir_ownership()?;
 
     if !tls::ca::ca_exists()? {
         info!("generating CA certificate");

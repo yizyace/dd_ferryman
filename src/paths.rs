@@ -1,3 +1,4 @@
+use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -36,6 +37,30 @@ pub fn ensure_dirs() -> Result<()> {
         std::fs::create_dir_all(&dir)
             .with_context(|| format!("failed to create directory: {}", dir.display()))?;
     }
+    Ok(())
+}
+
+/// Chown the data directory and its immediate children to match the real
+/// user's home directory ownership.  This fixes the case where `sudo`
+/// created the dirs as root but `link`/`unlink` run unprivileged.
+///
+/// Errors are intentionally ignored — if we aren't root the chown is
+/// unnecessary (dirs already belong to us) or impossible anyway.
+pub(crate) fn fix_data_dir_ownership() -> Result<()> {
+    let home = dirs::home_dir().context("could not determine home directory")?;
+    let home_meta = std::fs::metadata(&home)
+        .with_context(|| format!("failed to stat home directory: {}", home.display()))?;
+
+    let uid = home_meta.uid();
+    let gid = home_meta.gid();
+
+    let data = data_dir()?;
+    let _ = std::os::unix::fs::chown(&data, Some(uid), Some(gid));
+
+    for entry in std::fs::read_dir(&data).into_iter().flatten().flatten() {
+        let _ = std::os::unix::fs::chown(entry.path(), Some(uid), Some(gid));
+    }
+
     Ok(())
 }
 
